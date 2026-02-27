@@ -1,0 +1,15 @@
+﻿build/
+.dart_tool/
+.idea/
+*.iml
+.vscode/
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+key.properties
+*.aab
+*.apk
