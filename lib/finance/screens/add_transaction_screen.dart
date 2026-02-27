@@ -14,7 +14,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
 
-  TransactionType _type = TransactionType.expense; // Mặc định là Chi tiêu
+  TransactionType _type = TransactionType.expense;
   DateTime _selectedDate = DateTime.now();
   String? _selectedCategoryId;
   String? _selectedAccountId;
@@ -22,13 +22,52 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void initState() {
     super.initState();
-    // Chọn mặc định ví đầu tiên và hạng mục đầu tiên
-    if (_manager.accounts.isNotEmpty)
+    if (_manager.accounts.isNotEmpty) {
       _selectedAccountId = _manager.accounts[0].id;
-    if (_manager.categories.isNotEmpty)
+    }
+    if (_manager.categories.isNotEmpty) {
       _selectedCategoryId = _manager.categories
           .firstWhere((c) => c.type == _type)
           .id;
+    }
+  }
+
+  // ==========================================
+  // HỆ THỐNG AI PHÂN TÍCH HÀNH VI CHI TIÊU
+  // ==========================================
+  String _analyzeBehavior(double amount, String note, TransactionType type) {
+    if (type != TransactionType.expense) return ""; // Chỉ phân tích chi tiêu
+
+    String noteLower = note.toLowerCase();
+
+    // 1. Phân tích theo từ khóa
+    if (noteLower.contains("trà sữa") ||
+        noteLower.contains("cafe") ||
+        noteLower.contains("cafe")) {
+      return "🤖 Trợ lý AI: Hoang phí quá! Một ly trà sữa bằng 1 bữa cơm rồi đấy. Cắt giảm nhé!";
+    }
+    if (noteLower.contains("nhậu") ||
+        noteLower.contains("bia") ||
+        noteLower.contains("rượu")) {
+      return "🤖 Trợ lý AI: Nhậu nhẹt vừa hại sức khỏe vừa đau ví. Hạn chế nhé sếp!";
+    }
+    if (noteLower.contains("shopee") ||
+        noteLower.contains("lazada") ||
+        noteLower.contains("quần áo")) {
+      return "🤖 Trợ lý AI: Lại chốt đơn à? Bạn có thực sự cần món đồ này không đấy?";
+    }
+    if (noteLower.contains("game") || noteLower.contains("nạp")) {
+      return "🤖 Trợ lý AI: Nạp game ít thôi! Tiền này đem đầu tư sinh lời ngon hơn.";
+    }
+
+    // 2. Phân tích theo số tiền (Nếu không có từ khóa nhưng tiêu lớn)
+    if (amount >= 2000000) {
+      return "🤖 Trợ lý AI: Cảnh báo! Bạn vừa xuất một khoản khá lớn. Hãy đảm bảo nó nằm trong ngân sách.";
+    } else if (amount >= 500000) {
+      return "🤖 Trợ lý AI: Khoản chi này không nhỏ đâu nha. Rút ví từ từ thôi!";
+    }
+
+    return ""; // Tiêu ít và bình thường thì không nhắc
   }
 
   void _save() {
@@ -43,11 +82,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
+    double amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
 
+    // Lưu giao dịch vào Core
     _manager.addTransaction(
       Transaction(
-        id: DateTime.now().toString(),
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
         amount: amount,
         accountId: _selectedAccountId!,
         categoryId: _selectedCategoryId!,
@@ -56,144 +96,173 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       ),
     );
 
-    Navigator.pop(context, true); // Trả về true để màn hình chính reload
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Đã lưu giao dịch thành công!")),
-    );
+    // KÍCH HOẠT AI PHÂN TÍCH VÀ CẢNH BÁO
+    String aiMessage = _analyzeBehavior(amount, _noteCtrl.text, _type);
+
+    Navigator.pop(context, true); // Đóng màn hình trước
+
+    // Hiện thông báo AI
+    if (aiMessage.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.smart_toy, color: Colors.amber, size: 30),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  aiMessage,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.blueGrey[900],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } else {
+      // Báo lưu thành công bình thường
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Lưu giao dịch thành công"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Thêm giao dịch mới"),
+        title: const Text("Thêm giao dịch"),
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. CHỌN LOẠI (THU / CHI)
             Row(
               children: [
                 Expanded(
                   child: _buildTypeButton(
-                    "CHI TIÊU",
+                    "Chi tiêu",
                     TransactionType.expense,
-                    Colors.red,
+                    AppColors.expense,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildTypeButton(
-                    "THU NHẬP",
+                    "Thu nhập",
                     TransactionType.income,
-                    Colors.green,
+                    AppColors.income,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-
-            // 2. NHẬP SỐ TIỀN
-            const Text("Số tiền", style: TextStyle(color: Colors.white70)),
             TextField(
               controller: _amountCtrl,
               keyboardType: TextInputType.number,
               style: const TextStyle(
-                color: AppColors.accent,
-                fontSize: 30,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
-              decoration: const InputDecoration(
-                hintText: "0",
-                hintStyle: TextStyle(color: Colors.grey),
-                border: InputBorder.none,
-                suffixText: "đ",
-                suffixStyle: TextStyle(color: Colors.white),
-              ),
+              decoration: _inputDecor("Số tiền (VND)", Icons.attach_money),
             ),
-            const Divider(color: Colors.grey),
-
-            // 3. CHỌN HẠNG MỤC
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              value: _selectedCategoryId,
-              dropdownColor: AppColors.cardBg,
-              decoration: _inputDecor("Hạng mục", Icons.category),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _noteCtrl,
               style: const TextStyle(color: Colors.white),
-              items: _manager.categories.where((c) => c.type == _type).map((c) {
-                return DropdownMenuItem(value: c.id, child: Text(c.name));
-              }).toList(),
-              onChanged: (val) => setState(() => _selectedCategoryId = val),
-            ),
-
-            // 4. CHỌN VÍ
-            const SizedBox(height: 15),
-            DropdownButtonFormField<String>(
-              value: _selectedAccountId,
-              dropdownColor: AppColors.cardBg,
               decoration: _inputDecor(
-                "Tài khoản / Ví",
-                Icons.account_balance_wallet,
+                "Ghi chú (Ví dụ: Trà sữa, Mua sắm...)",
+                Icons.notes,
               ),
-              style: const TextStyle(color: Colors.white),
-              items: _manager.accounts.map((a) {
-                return DropdownMenuItem(
-                  value: a.id,
-                  child: Text(
-                    "${a.name} (${NumberFormat("#,###").format(a.balance)} đ)",
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => _selectedAccountId = val),
             ),
-
-            // 5. NGÀY THÁNG & GHI CHÚ
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
+            _buildDropdown<String>(
+              "Chọn ví",
+              Icons.account_balance_wallet,
+              _selectedAccountId,
+              _manager.accounts
+                  .map(
+                    (a) => DropdownMenuItem(value: a.id, child: Text(a.name)),
+                  )
+                  .toList(),
+              (val) => setState(() => _selectedAccountId = val),
+            ),
+            const SizedBox(height: 20),
+            _buildDropdown<String>(
+              "Chọn hạng mục",
+              Icons.category,
+              _selectedCategoryId,
+              _manager.categories
+                  .where((c) => c.type == _type)
+                  .map(
+                    (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
+                  )
+                  .toList(),
+              (val) => setState(() => _selectedCategoryId = val),
+            ),
+            const SizedBox(height: 20),
             InkWell(
               onTap: () async {
                 final d = await showDatePicker(
                   context: context,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2030),
                   initialDate: _selectedDate,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
                 );
                 if (d != null) setState(() => _selectedDate = d);
               },
-              child: InputDecorator(
-                decoration: _inputDecor("Ngày giao dịch", Icons.calendar_today),
-                child: Text(
-                  DateFormat("dd/MM/yyyy").format(_selectedDate),
-                  style: const TextStyle(color: Colors.white),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: AppColors.primary),
+                    const SizedBox(width: 15),
+                    Text(
+                      DateFormat("dd/MM/yyyy").format(_selectedDate),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: _noteCtrl,
-              style: const TextStyle(color: Colors.white),
-              decoration: _inputDecor("Ghi chú / Diễn giải", Icons.edit),
-            ),
-
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 55,
               child: ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                 ),
                 child: const Text(
                   "LƯU GIAO DỊCH",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -209,11 +278,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return InkWell(
       onTap: () => setState(() {
         _type = type;
-        // Reset category khi đổi loại
         _selectedCategoryId = _manager.categories
             .firstWhere(
               (c) => c.type == _type,
-              orElse: () => _manager.categories[0],
+              orElse: () =>
+                  _manager.categories[0], // Sửa chữ orelse thành orElse ở đây
             )
             .id;
       }),
@@ -246,6 +315,41 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
+      ),
+    );
+  }
+
+  Widget _buildDropdown<T>(
+    String hint,
+    IconData icon,
+    T? value,
+    List<DropdownMenuItem<T>> items,
+    ValueChanged<T?> onChanged,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary),
+          const SizedBox(width: 15),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<T>(
+                dropdownColor: AppColors.cardBg,
+                value: value,
+                isExpanded: true,
+                hint: Text(hint, style: const TextStyle(color: Colors.grey)),
+                items: items,
+                onChanged: onChanged,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

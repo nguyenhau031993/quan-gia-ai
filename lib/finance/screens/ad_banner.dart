@@ -15,23 +15,36 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
   @override
   void initState() {
     super.initState();
-    if (!FinanceManager().isPremium) { _loadAd(); }
+    if (!FinanceManager().isPremium) {
+      _loadAd();
+    }
   }
 
   void _loadAd() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
+      adUnitId:
+          'ca-app-pub-6795823365574837/4131866717', // MÃ BANNER THẬT CỦA ANH
       request: const AdRequest(),
       size: AdSize.banner,
+      // ... giữ nguyên phần dưới
       listener: BannerAdListener(
-        onAdLoaded: (ad) { setState(() { _isLoaded = true; }); },
-        onAdFailedToLoad: (ad, err) { ad.dispose(); },
+        onAdLoaded: (ad) {
+          setState(() {
+            _isLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, err) {
+          ad.dispose();
+        },
       ),
     )..load();
   }
 
   @override
-  void dispose() { _bannerAd?.dispose(); super.dispose(); }
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

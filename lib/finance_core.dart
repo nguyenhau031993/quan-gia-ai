@@ -593,6 +593,22 @@ class FinanceManager {
         colorValue: Colors.grey.value,
         isDefault: true,
       ),
+      Category(
+        id: 'l1',
+        name: 'Cho vay',
+        type: TransactionType.expense,
+        iconCode: Icons.arrow_upward.codePoint,
+        colorValue: Colors.red.value,
+        isDefault: true,
+      ),
+      Category(
+        id: 'l2',
+        name: 'Đi vay',
+        type: TransactionType.income,
+        iconCode: Icons.arrow_downward.codePoint,
+        colorValue: Colors.green.value,
+        isDefault: true,
+      ),
     ];
   }
 

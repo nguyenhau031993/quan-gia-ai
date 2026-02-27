@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../finance_core.dart';
 
 class AiChatScreen extends StatefulWidget {
@@ -10,17 +11,65 @@ class AiChatScreen extends StatefulWidget {
 
 class _AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FinanceManager _manager = FinanceManager();
+  final NumberFormat _fmt = NumberFormat("#,###", "vi_VN");
+
   final List<Map<String, String>> _messages = [
     {
       "role": "ai",
       "text":
-          "Chào bạn! Tôi là trợ lý tài chính AIA. Tôi có thể giúp gì cho bạn hôm nay?",
+          "Chào sếp! Tôi là Quản gia AI. Sếp có thể hỏi tôi về số dư, tổng chi tiêu tháng này, hoặc mắng vốn tôi nếu sếp lỡ tiêu hoang nhé! 🤖",
     },
   ];
   bool _isTyping = false;
 
+  // BỘ NÃO AI (Phân tích truy vấn nội bộ)
+  String _processAIQuery(String query) {
+    String lower = query.toLowerCase();
+
+    // 1. Hỏi về số dư
+    if (lower.contains("số dư") ||
+        lower.contains("còn lại") ||
+        lower.contains("có bao nhiêu")) {
+      double total = _manager.getTotalAssets();
+      return "Sếp hiện đang có tổng cộng ${_fmt.format(total)} VNĐ trong tất cả các ví. ${total < 500000 ? 'Sắp mạt rệp rồi, tiết kiệm đi sếp!' : 'Khá rủng rỉnh đấy sếp!'}";
+    }
+
+    // 2. Hỏi về tổng chi tiêu
+    if (lower.contains("chi tiêu") ||
+        lower.contains("đã tiêu") ||
+        lower.contains("tổng chi")) {
+      DateTime now = DateTime.now();
+      double totalSpent = _manager.transactions
+          .where((t) => t.date.month == now.month && t.date.year == now.year)
+          .where((t) {
+            try {
+              return _manager.categories
+                      .firstWhere((c) => c.id == t.categoryId)
+                      .type ==
+                  TransactionType.expense;
+            } catch (_) {
+              return false;
+            }
+          })
+          .fold(0, (sum, item) => sum + item.amount);
+
+      return "Trong tháng này sếp đã đốt hết ${_fmt.format(totalSpent)} VNĐ rồi. ${totalSpent > 3000000 ? 'Tốc độ đốt tiền của sếp nhanh hơn tốc độ ánh sáng đấy!' : 'Vẫn trong tầm kiểm soát, tốt lắm sếp!'}";
+    }
+
+    // 3. Phân tích một khoản vừa mua (Ví dụ: "Tôi vừa mua trà sữa 50k")
+    if (lower.contains("trà sữa") ||
+        lower.contains("nhậu") ||
+        lower.contains("shopee")) {
+      return "Lại nữa à sếp? Những khoản lặt vặt như thế này chính là nguyên nhân khiến cuối tháng sếp phải ăn mì tôm đấy. Lần sau kiềm chế lại nhé!";
+    }
+
+    // 4. Mặc định
+    return "Tính năng này đang được nâng cấp. Sếp hãy hỏi tôi về 'Số dư' hoặc 'Tổng chi tiêu tháng này' nhé!";
+  }
+
   void _sendMessage() async {
-    if (_controller.text.isEmpty) return;
+    if (_controller.text.trim().isEmpty) return;
 
     final userText = _controller.text;
     setState(() {
@@ -29,23 +78,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
       _isTyping = true;
     });
 
-    // Giả lập AI trả lời (Sau này sẽ nối API thật)
+    FocusScope.of(context).unfocus(); // Đóng bàn phím
+
+    // Giả lập AI đang suy nghĩ
     await Future.delayed(const Duration(seconds: 1));
 
-    String reply =
-        "Tôi đã ghi nhận: '$userText'. Bạn có muốn tôi phân tích thêm không?";
-    if (userText.toLowerCase().contains("chi tiêu")) {
-      reply =
-          "Dựa trên dữ liệu, tháng này bạn đã chi tiêu 2.300.000đ cho Ăn uống. Bạn nên cân nhắc giảm bớt.";
-    } else if (userText.toLowerCase().contains("tiết kiệm")) {
-      reply =
-          "Bạn đang có 3 sổ tiết kiệm sắp đáo hạn. Lãi suất hiện tại đang tốt, bạn nên gửi thêm.";
-    }
+    String reply = _processAIQuery(userText);
 
     if (mounted) {
       setState(() {
-        _messages.add({"role": "ai", "text": reply});
         _isTyping = false;
+        _messages.add({"role": "ai", "text": reply});
       });
     }
   }
@@ -55,45 +98,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.cardBg,
-        elevation: 0,
-        title: Row(
+        title: const Row(
           children: [
-            // --- SỬA LỖI TẠI ĐÂY: DÙNG ICON THAY VÌ ẢNH ---
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "AIA Assistant",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  "Luôn sẵn sàng",
-                  style: TextStyle(fontSize: 12, color: Colors.greenAccent),
-                ),
-              ],
-            ),
+            Icon(Icons.smart_toy, color: Colors.amber),
+            SizedBox(width: 10),
+            Text("Quản gia AI"),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () => setState(() => _messages.clear()),
-          ),
-        ],
+        backgroundColor: AppColors.cardBg,
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -101,34 +114,34 @@ class _AiChatScreenState extends State<AiChatScreen> {
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length,
-              itemBuilder: (ctx, i) {
-                final msg = _messages[i];
-                final isAi = msg['role'] == 'ai';
+              itemBuilder: (context, index) {
+                final msg = _messages[index];
+                bool isUser = msg["role"] == "user";
                 return Align(
-                  alignment: isAi
-                      ? Alignment.centerLeft
-                      : Alignment.centerRight,
+                  alignment: isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 15),
+                    padding: const EdgeInsets.all(15),
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.75,
                     ),
                     decoration: BoxDecoration(
-                      color: isAi ? AppColors.cardBg : AppColors.primary,
+                      color: isUser ? AppColors.primary : AppColors.cardBg,
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(12),
-                        topRight: const Radius.circular(12),
-                        bottomLeft: isAi
-                            ? Radius.zero
-                            : const Radius.circular(12),
-                        bottomRight: isAi
-                            ? const Radius.circular(12)
-                            : Radius.zero,
+                        topLeft: const Radius.circular(20),
+                        topRight: const Radius.circular(20),
+                        bottomLeft: isUser
+                            ? const Radius.circular(20)
+                            : const Radius.circular(0),
+                        bottomRight: isUser
+                            ? const Radius.circular(0)
+                            : const Radius.circular(20),
                       ),
                     ),
                     child: Text(
-                      msg['text']!,
+                      msg["text"]!,
                       style: const TextStyle(color: Colors.white, fontSize: 15),
                     ),
                   ),
@@ -139,9 +152,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
           if (_isTyping)
             const Padding(
               padding: EdgeInsets.all(8.0),
-              child: Text(
-                "AIA đang nhập...",
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  "Quản gia đang gõ chữ...",
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               ),
             ),
           Container(
@@ -154,7 +173,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     controller: _controller,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: "Hỏi tôi về tài chính...",
+                      hintText: "Hỏi: Tháng này tiêu bao nhiêu?",
                       hintStyle: const TextStyle(color: Colors.grey),
                       filled: true,
                       fillColor: AppColors.background,
